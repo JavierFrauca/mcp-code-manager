@@ -1,0 +1,58 @@
+# MCP Code Manager - Dependencias
+# Core MCP
+mcp>=1.0.0
+
+# Git operations
+GitPython>=3.1.40
+
+# Async operations
+aiofiles>=23.2.0
+
+# Windows recycle bin support (optional)
+winshell>=0.6; sys_platform == "win32"
+
+# Data validation
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# HTTP client for repository operations
+httpx>=0.25.0
+aiohttp>=3.9.0
+
+# File operations
+pathlib2>=2.3.7;python_version<"3.10"
+watchdog>=3.0.0
+
+# Code analysis (opcionales - solo si se necesita parsing avanzado)
+# tree-sitter>=0.20.4
+# tree-sitter-c-sharp>=0.20.0
+
+# Logging and monitoring
+structlog>=23.2.0
+rich>=13.7.0
+
+# Configuration
+python-dotenv>=1.0.0
+toml>=0.10.2
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.12.0
+pytest-cov>=4.1.0
+
+# Development
+black>=23.12.0
+isort>=5.13.0
+flake8>=6.1.0
+mypy>=1.8.0
+
+# Optional: Enhanced diff support
+# unified-diff>=0.4.0
+# difflib2>=0.1.0
+
+# Dependencias adicionales para el servidor HTTP
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+python-multipart>=0.0.6
