@@ -213,6 +213,10 @@ class FileManager:
             
             items = []
             for item in os.listdir(directory_path):
+                # Excluir entradas especiales de directorio
+                if item in ('.', '..'):
+                    continue
+                    
                 item_path = os.path.join(directory_path, item)
                 
                 # Filtrar por patrón si se especifica

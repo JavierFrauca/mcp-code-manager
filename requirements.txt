@@ -27,6 +27,11 @@ watchdog>=3.0.0
 # tree-sitter>=0.20.4
 # tree-sitter-c-sharp>=0.20.0
 
+# C# Testing dependencies
+subprocess32>=3.5.4;python_version<"3.8"  # Para ejecutar comandos dotnet
+xmltodict>=0.13.0    # Para parsear resultados XML de tests
+lxml>=4.9.0          # Para parsing XML robusto
+
 # Logging and monitoring
 structlog>=23.2.0
 rich>=13.7.0

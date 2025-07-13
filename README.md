@@ -38,7 +38,7 @@ Un servidor MCP (Model Context Protocol) comple### 🔍 A### 🔐 Verificación 
 - **Estadísticas Detalladas**: Información de tamaños, tipos y extensiones
 - **Exclusión Inteligente**: Omisión automática de directorios temporales y de sistema
 
-### 🔀 Operaciones Git
+### 🔀 Funcionalidades Git
 
 - **Estado Detallado**: Información completa de archivos staged/unstaged/untracked
 - **Integración Nativa**: Verificación de repositorios Git y permisos
@@ -51,7 +51,31 @@ Un servidor MCP (Model Context Protocol) comple### 🔍 A### 🔐 Verificación 
 - **Operaciones Atómicas**: Verificaciones previas antes de modificaciones destructivas
 - **Logs Detallados**: Registro completo de operaciones para debugging
 
-### 🔍 Análisis de Código C#
+### 📊 Sistema de Logging y Diagnóstico
+
+- **Logging Automático**: Registro automático de todas las peticiones MCP y ejecuciones de herramientas
+- **Múltiples Niveles**: Logs separados para requests/responses, ejecuciones, errores y debug
+- **Rotación Automática**: Archivos de log con rotación por tamaño (10MB) y backup (5 archivos)
+- **Análisis Integrado**: Herramientas de análisis estadístico y búsqueda en logs
+- **Diagnóstico Inteligente**: Detección automática de problemas y recomendaciones
+- **Sanitización de Datos**: Ocultación automática de información sensible en logs
+- **Exportación de Reportes**: Generación de resúmenes completos para diagnóstico
+
+#### Herramientas de Logging Disponibles
+
+- **`get_logs_stats`** - Estadísticas de uso y rendimiento
+- **`search_logs`** - Búsqueda de texto específico en logs
+- **`get_recent_errors`** - Lista de errores recientes del sistema
+- **`export_log_summary`** - Resumen completo para diagnóstico
+
+#### Archivos de Log
+
+- **`logs/mcp_requests.log`** - Todas las peticiones y respuestas MCP
+- **`logs/tools_execution.log`** - Ejecución de herramientas con tiempos y resultados
+- **`logs/errors.log`** - Errores del sistema con stack traces completos
+- **`logs/debug.log`** - Información detallada de debug y trazabilidad
+
+### 🔍 Análisis de Código C Sharp
 
 - **Búsqueda de Clases**: Localización directa por nombre de archivo o búsqueda profunda en contenido
 - **Análisis Automático**: Extracción de metadatos de archivos C# (namespaces, clases, métodos, propiedades)
@@ -63,10 +87,12 @@ Un servidor MCP (Model Context Protocol) comple### 🔍 A### 🔐 Verificación 
 ## � Herramientas Disponibles
 
 ### 🧪 Herramientas de Sistema
+
 - **`ping`** - Test de conectividad (responde con "pong")
 - **`echo`** - Repite el mensaje enviado
 
 ### 📄 Gestión de Archivos
+
 - **`get_file_content`** - Lee el contenido completo de un archivo
 - **`set_file_content`** - Crea o modifica archivos con backup automático
 - **`rename_file`** - Renombra o mueve archivos
@@ -74,19 +100,22 @@ Un servidor MCP (Model Context Protocol) comple### 🔍 A### 🔐 Verificación 
 - **`copy_file`** - Copia archivos a otra ubicación
 
 ### 📁 Gestión de Directorios
+
 - **`list_directory`** - Lista contenido básico de directorios
 - **`list_files`** - Listado avanzado con filtros, patrones y estadísticas
 - **`create_directory`** - Crea directorios con estructura padre automática
 - **`rename_directory`** - Renombra/mueve directorios
 - **`delete_directory`** - Elimina directorios a la papelera
 
-### � Análisis de Código C#
+### � Análisis de Código C Sharp
+
 - **`find_class`** - Localiza clases específicas con búsqueda directa o profunda
 - **`get_cs_file_content`** - Obtiene contenido de archivos C# con análisis automático
 - **`find_elements`** - Busca DTOs, Services, Controllers, Interfaces, Enums
 - **`get_solution_structure`** - Estructura completa de soluciones C# con estadísticas
 
 ### �🔐 Verificación de Sistema
+
 - **`check_permissions`** - Verifica permisos CRUD completos sobre rutas
   - Permisos de lectura, escritura, ejecución
   - Capacidades de creación/eliminación de archivos y directorios
@@ -94,9 +123,11 @@ Un servidor MCP (Model Context Protocol) comple### 🔍 A### 🔐 Verificación 
   - Estado de repositorio Git
 
 ### 🔀 Operaciones Git
+
 - **`git_status`** - Estado detallado del repositorio con formato visual
 
 ### ✨ Características Especiales
+
 - **Papelera de Reciclaje**: Eliminación segura en Windows con `winshell`
 - **Backups Automáticos**: Copias de seguridad antes de modificaciones
 - **Encoding Inteligente**: Detección automática UTF-8/Latin-1
@@ -277,7 +308,7 @@ await delete_directory(directory_path="./temp/obsolete_files")
 await list_directory(directory_path="./src")
 ```
 
-#### Análisis de Código C#
+#### Análisis de Código C Sharp
 
 ```python
 # Buscar una clase específica
@@ -308,7 +339,7 @@ get_solution_structure(
 
 ## 📚 API Reference
 
-### Herramientas de Análisis de Código C#
+### Herramientas de Análisis de Código C Sharp
 
 | Herramienta | Descripción | Parámetros |
 |-------------|-------------|------------|

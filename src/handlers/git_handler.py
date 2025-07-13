@@ -331,3 +331,49 @@ class GitHandler:
             return await self.git_manager.manage_remote(repo_url, action, remote_name, remote_url)
         except Exception as e:
             raise GitError(f"Error gestionando remoto: {str(e)}")
+
+    async def init(
+        self, 
+        repo_path: str, 
+        bare: bool = False,
+        initial_branch: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Inicializa un nuevo repositorio Git
+        
+        Args:
+            repo_path: Ruta donde inicializar el repositorio
+            bare: Si crear un repositorio bare
+            initial_branch: Nombre de la rama inicial (opcional)
+            
+        Returns:
+            Resultado de la inicialización
+        """
+        try:
+            return await self.git_manager.init_repository(repo_path, bare, initial_branch)
+        except Exception as e:
+            raise GitError(f"Error inicializando repositorio: {str(e)}")
+    
+    async def add(
+        self, 
+        repo_url: str, 
+        files: Optional[List[str]] = None,
+        all_files: bool = False,
+        update: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Agrega archivos al staging area
+        
+        Args:
+            repo_url: URL del repositorio
+            files: Lista de archivos específicos (opcional)
+            all_files: Si agregar todos los archivos (git add .)
+            update: Si solo actualizar archivos ya tracked (git add -u)
+            
+        Returns:
+            Resultado de la operación add
+        """
+        try:
+            return await self.git_manager.add_files(repo_url, files, all_files, update)
+        except Exception as e:
+            raise GitError(f"Error agregando archivos: {str(e)}")
