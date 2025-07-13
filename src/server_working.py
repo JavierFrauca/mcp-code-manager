@@ -47,7 +47,8 @@ except ImportError as e:
 # Importaciones de handlers y servicios
 try:
     from handlers.file_handler import FileHandler
-    from utils.exceptions import FileOperationError
+    from handlers.code_handler import CodeHandler
+    from utils.exceptions import FileOperationError, CodeAnalysisError
 except ImportError as e:
     print(f"Error: Módulos de handlers no disponibles - {e}", file=sys.stderr)
     sys.exit(1)
@@ -58,6 +59,7 @@ class MCPWorkingServer:
     def __init__(self):
         self.server = Server("mcp-code-manager")
         self.file_handler = FileHandler()
+        self.code_handler = CodeHandler()
         print("[INIT] Servidor MCP inicializado", file=sys.stderr)
         self._setup_tools()
         
@@ -297,6 +299,86 @@ class MCPWorkingServer:
                         },
                         "required": []
                     }
+                ),
+                # Herramientas de análisis de código C#
+                Tool(
+                    name="find_class",
+                    description="Localiza clases específicas en repositorios C# con búsqueda directa o profunda",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "repo_url": {
+                                "type": "string",
+                                "description": "URL del repositorio C#"
+                            },
+                            "class_name": {
+                                "type": "string",
+                                "description": "Nombre de la clase a buscar"
+                            },
+                            "search_type": {
+                                "type": "string",
+                                "enum": ["direct", "deep"],
+                                "description": "Tipo de búsqueda (direct: por nombre de archivo, deep: contenido completo)",
+                                "default": "direct"
+                            }
+                        },
+                        "required": ["repo_url", "class_name"]
+                    }
+                ),
+                Tool(
+                    name="get_cs_file_content",
+                    description="Obtiene contenido de archivos C# con análisis automático de código",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "repo_url": {
+                                "type": "string",
+                                "description": "URL del repositorio C#"
+                            },
+                            "file_path": {
+                                "type": "string",
+                                "description": "Ruta relativa del archivo C#"
+                            }
+                        },
+                        "required": ["repo_url", "file_path"]
+                    }
+                ),
+                Tool(
+                    name="find_elements",
+                    description="Busca elementos específicos como DTOs, Services, Controllers, Interfaces, Enums en código C#",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "repo_url": {
+                                "type": "string",
+                                "description": "URL del repositorio C#"
+                            },
+                            "element_type": {
+                                "type": "string",
+                                "enum": ["dto", "service", "controller", "interface", "enum", "class"],
+                                "description": "Tipo de elemento a buscar"
+                            },
+                            "element_name": {
+                                "type": "string",
+                                "description": "Nombre del elemento (búsqueda parcial)"
+                            }
+                        },
+                        "required": ["repo_url", "element_type", "element_name"]
+                    }
+                ),
+                Tool(
+                    name="get_solution_structure",
+                    description="Obtiene la estructura completa de una solución C# con análisis detallado",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "repo_url": {
+                                "type": "string",
+                                "description": "URL del repositorio C#"
+                            }
+                        },
+                        "required": ["repo_url"]
+                    }
                 )
             ]
         
@@ -368,6 +450,28 @@ class MCPWorkingServer:
                     include_directories = arguments.get("include_directories", False)
                     max_depth = arguments.get("max_depth", 1)
                     return await self._list_files(directory_path, file_pattern, include_directories, max_depth)
+                
+                # Herramientas de análisis de código C#
+                elif name == "find_class":
+                    repo_url = arguments.get("repo_url", "")
+                    class_name = arguments.get("class_name", "")
+                    search_type = arguments.get("search_type", "direct")
+                    return await self._find_class(repo_url, class_name, search_type)
+                
+                elif name == "get_cs_file_content":
+                    repo_url = arguments.get("repo_url", "")
+                    file_path = arguments.get("file_path", "")
+                    return await self._get_cs_file_content(repo_url, file_path)
+                
+                elif name == "find_elements":
+                    repo_url = arguments.get("repo_url", "")
+                    element_type = arguments.get("element_type", "")
+                    element_name = arguments.get("element_name", "")
+                    return await self._find_elements(repo_url, element_type, element_name)
+                
+                elif name == "get_solution_structure":
+                    repo_url = arguments.get("repo_url", "")
+                    return await self._get_solution_structure(repo_url)
                 
                 else:
                     return [TextContent(
@@ -633,7 +737,7 @@ class MCPWorkingServer:
                 except Exception as e:
                     print(f"[WARNING] No se pudo crear backup: {e}", file=sys.stderr)
             
-            # Usar el directorio actual como repositorio ficticio
+            # Usar el directorio current_dir como repositorio ficticio
             current_dir = Path.cwd()
             fake_repo_url = f"file://{current_dir}"
             
@@ -669,7 +773,7 @@ class MCPWorkingServer:
             if not source_path or not dest_path:
                 return [TextContent(type="text", text="❌ Error: Rutas origen y destino requeridas")]
             
-            # Usar el directorio actual como repositorio ficticio
+            # Usar el directorio current_dir como repositorio ficticio
             current_dir = Path.cwd()
             fake_repo_url = f"file://{current_dir}"
             
@@ -726,7 +830,7 @@ class MCPWorkingServer:
             if not source_path or not dest_path:
                 return [TextContent(type="text", text="❌ Error: Rutas origen y destino requeridas")]
             
-            # Usar el directorio actual como repositorio ficticio
+            # Usar el directorio current_dir como repositorio ficticio
             current_dir = Path.cwd()
             fake_repo_url = f"file://{current_dir}"
             
@@ -747,7 +851,7 @@ class MCPWorkingServer:
             if not target_path:
                 target_path = "."
             
-            # Usar el directorio actual como repositorio ficticio
+            # Usar el directorio current_dir como repositorio ficticio
             current_dir = Path.cwd()
             fake_repo_url = f"file://{current_dir}"
             
@@ -834,7 +938,7 @@ class MCPWorkingServer:
             if not directory_path:
                 directory_path = "."
             
-            # Usar el directorio actual como repositorio ficticio
+            # Usar el directorio current_dir como repositorio ficticio
             current_dir = Path.cwd()
             fake_repo_url = f"file://{current_dir}"
             
@@ -891,7 +995,173 @@ class MCPWorkingServer:
             
         except Exception as e:
             return [TextContent(type="text", text=f"❌ Error listando archivos: {str(e)}")]
-
+    
+    # === Métodos auxiliares para análisis de código C# ===
+    
+    async def _find_class(self, repo_url: str, class_name: str, search_type: str = "direct") -> List[TextContent]:
+        """Localiza una clase específica en el repositorio C#"""
+        try:
+            if not repo_url or not class_name:
+                return [TextContent(type="text", text="❌ Error: URL del repositorio y nombre de clase requeridos")]
+            
+            result = await self.code_handler.find_class(repo_url, class_name, search_type)
+            
+            response_text = f"🔍 Búsqueda de clase '{class_name}' (método: {search_type})\n\n"
+            response_text += f"✅ Clase encontrada: {result['class_name']}\n"
+            response_text += f"📄 Archivo: {result['file_path']}\n"
+            response_text += f"🔍 Método: {result['search_type']}\n\n"
+            
+            # Información del análisis si está disponible
+            analysis = result.get('analysis')
+            if analysis:
+                response_text += "📊 Análisis del archivo:\n"
+                response_text += f"  • Namespace: {analysis.get('namespace', 'N/A')}\n"
+                response_text += f"  • Líneas: {analysis.get('lines', 0)}\n"
+                response_text += f"  • Elementos: {len(analysis.get('elements', []))}\n"
+                response_text += f"  • Métodos: {len(analysis.get('methods', []))}\n"
+                response_text += f"  • Propiedades: {len(analysis.get('properties', []))}\n"
+            
+            return [TextContent(type="text", text=response_text)]
+            
+        except CodeAnalysisError as e:
+            return [TextContent(type="text", text=f"❌ {str(e)}")]
+        except Exception as e:
+            return [TextContent(type="text", text=f"❌ Error buscando clase: {str(e)}")]
+    
+    async def _get_cs_file_content(self, repo_url: str, file_path: str) -> List[TextContent]:
+        """Obtiene contenido de archivo C# con análisis"""
+        try:
+            if not repo_url or not file_path:
+                return [TextContent(type="text", text="❌ Error: URL del repositorio y ruta del archivo requeridos")]
+            
+            result = await self.code_handler.get_file_content(repo_url, file_path)
+            
+            response_text = f"📄 Archivo: {result['file_path']}\n\n"
+            response_text += f"📊 Información básica:\n"
+            response_text += f"  • Tamaño: {result['size']} bytes\n"
+            response_text += f"  • Líneas: {result['lines']}\n"
+            response_text += f"  • Encoding: {result['encoding']}\n\n"
+            
+            # Información del análisis si es C#
+            analysis = result.get('analysis')
+            if analysis:
+                response_text += "🔍 Análisis de código C#:\n"
+                response_text += f"  • Namespace: {analysis.get('namespace', 'N/A')}\n"
+                response_text += f"  • Elementos: {len(analysis.get('elements', []))}\n"
+                response_text += f"  • Métodos: {len(analysis.get('methods', []))}\n"
+                response_text += f"  • Propiedades: {len(analysis.get('properties', []))}\n\n"
+                
+                # Listar elementos encontrados
+                elements = analysis.get('elements', [])
+                if elements:
+                    response_text += "📋 Elementos encontrados:\n"
+                    for element in elements[:10]:  # Mostrar máximo 10
+                        response_text += f"  • {element['type']}: {element['name']}\n"
+                    if len(elements) > 10:
+                        response_text += f"  ... y {len(elements) - 10} elementos más\n"
+            
+            response_text += f"\n📝 Contenido del archivo:\n\n{result['content']}"
+            
+            return [TextContent(type="text", text=response_text)]
+            
+        except FileOperationError as e:
+            return [TextContent(type="text", text=f"❌ {str(e)}")]
+        except Exception as e:
+            return [TextContent(type="text", text=f"❌ Error obteniendo contenido: {str(e)}")]
+    
+    async def _find_elements(self, repo_url: str, element_type: str, element_name: str) -> List[TextContent]:
+        """Busca elementos específicos en el repositorio C#"""
+        try:
+            if not repo_url or not element_type or not element_name:
+                return [TextContent(type="text", text="❌ Error: URL del repositorio, tipo y nombre de elemento requeridos")]
+            
+            results = await self.code_handler.find_elements(repo_url, element_type, element_name)
+            
+            response_text = f"🔍 Búsqueda de {element_type}s que contengan '{element_name}'\n\n"
+            
+            if not results:
+                response_text += "❌ No se encontraron elementos coincidentes"
+                return [TextContent(type="text", text=response_text)]
+            
+            response_text += f"✅ Encontrados {len(results)} elemento(s):\n\n"
+            
+            for i, result in enumerate(results, 1):
+                response_text += f"{i}. 📋 {result['element_name']}\n"
+                response_text += f"   • Tipo: {result['element_type']}\n"
+                response_text += f"   • Archivo: {result['file_path']}\n"
+                if result.get('namespace'):
+                    response_text += f"   • Namespace: {result['namespace']}\n"
+                if result.get('line_number'):
+                    response_text += f"   • Línea: {result['line_number']}\n"
+                if result.get('modifiers'):
+                    response_text += f"   • Modificadores: {', '.join(result['modifiers'])}\n"
+                if result.get('summary'):
+                    response_text += f"   • Resumen: {result['summary']}\n"
+                response_text += "\n"
+            
+            return [TextContent(type="text", text=response_text)]
+            
+        except CodeAnalysisError as e:
+            return [TextContent(type="text", text=f"❌ {str(e)}")]
+        except Exception as e:
+            return [TextContent(type="text", text=f"❌ Error buscando elementos: {str(e)}")]
+    
+    async def _get_solution_structure(self, repo_url: str) -> List[TextContent]:
+        """Obtiene la estructura completa de la solución C#"""
+        try:
+            if not repo_url:
+                return [TextContent(type="text", text="❌ Error: URL del repositorio requerida")]
+            
+            structure = await self.code_handler.get_solution_structure(repo_url)
+            
+            response_text = f"🏗️ Estructura de la solución C#\n\n"
+            response_text += f"📁 Directorio: {structure['solution_path']}\n"
+            response_text += f"📄 Total archivos C#: {structure['total_cs_files']}\n\n"
+            
+            # Resumen estadístico
+            summary = structure['summary']
+            response_text += "📊 Resumen estadístico:\n"
+            response_text += f"  • Clases: {summary['total_classes']}\n"
+            response_text += f"  • Interfaces: {summary['total_interfaces']}\n"
+            response_text += f"  • Enums: {summary['total_enums']}\n"
+            response_text += f"  • Records: {summary['total_records']}\n\n"
+            
+            # Tipos de archivo
+            file_types = structure['file_types']
+            response_text += "📋 Tipos de archivos:\n"
+            response_text += f"  • Controllers: {len(file_types['controllers'])}\n"
+            response_text += f"  • Services: {len(file_types['services'])}\n"
+            response_text += f"  • Models: {len(file_types['models'])}\n"
+            response_text += f"  • DTOs: {len(file_types['dtos'])}\n"
+            response_text += f"  • Interfaces: {len(file_types['interfaces'])}\n"
+            response_text += f"  • Enums: {len(file_types['enums'])}\n"
+            response_text += f"  • Configuraciones: {len(file_types['configurations'])}\n"
+            response_text += f"  • Otros: {len(file_types['others'])}\n\n"
+            
+            # Namespaces principales
+            namespaces = structure['namespaces']
+            if namespaces:
+                response_text += "🗂️ Namespaces encontrados:\n"
+                for namespace, files in list(namespaces.items())[:10]:  # Mostrar máximo 10
+                    response_text += f"  • {namespace}: {len(files)} archivo(s)\n"
+                if len(namespaces) > 10:
+                    response_text += f"  ... y {len(namespaces) - 10} namespaces más\n"
+            
+            # Proyectos
+            projects = structure['projects']
+            if projects:
+                response_text += f"\n📦 Proyectos detectados ({len(projects)}):\n"
+                for project_name, project_info in projects.items():
+                    files_count = len(project_info.get('files', []))
+                    response_text += f"  • {project_name}: {files_count} archivo(s)\n"
+            
+            return [TextContent(type="text", text=response_text)]
+            
+        except CodeAnalysisError as e:
+            return [TextContent(type="text", text=f"❌ {str(e)}")]
+        except Exception as e:
+            return [TextContent(type="text", text=f"❌ Error obteniendo estructura: {str(e)}")]
+            
 async def main():
     """Función principal del servidor"""
     print("[START] Iniciando MCP Code Manager Server (Working Version)...", file=sys.stderr)

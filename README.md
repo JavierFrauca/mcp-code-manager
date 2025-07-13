@@ -1,6 +1,10 @@
 # MCP Code Manager
 
-Un servidor MCP (Model Context Protocol) completo para la gestión de archivos, directorios y operaciones Git. Permite a las IAs interactuar con el sistema de archivos local mediante herramientas robustas y seguras con soporte para papelera de reciclaje, validaciones avanzadas y verificación de permisos.
+Un servidor MCP (Model Context Protocol) comple### 🔍 A### 🔐 Verificación de Sistema
+
+- **`check_permissions`** - Verifica permisos CRUD completos sobre rutaslisis de Código C#
+
+- **`find_class`** - Localiza clases específicas con búsqueda directa o profunda para la gestión de archivos, directorios y operaciones Git. Permite a las IAs interactuar con el sistema de archivos local mediante herramientas robustas y seguras con soporte para papelera de reciclaje, validaciones avanzadas y verificación de permisos.
 
 ## 🚀 Características
 
@@ -47,6 +51,15 @@ Un servidor MCP (Model Context Protocol) completo para la gestión de archivos, 
 - **Operaciones Atómicas**: Verificaciones previas antes de modificaciones destructivas
 - **Logs Detallados**: Registro completo de operaciones para debugging
 
+### 🔍 Análisis de Código C#
+
+- **Búsqueda de Clases**: Localización directa por nombre de archivo o búsqueda profunda en contenido
+- **Análisis Automático**: Extracción de metadatos de archivos C# (namespaces, clases, métodos, propiedades)
+- **Búsqueda de Elementos**: Localización específica de DTOs, Services, Controllers, Interfaces, Enums
+- **Estructura de Solución**: Análisis completo de proyectos C# con estadísticas detalladas
+- **Categorización Inteligente**: Organización automática por tipos de archivo y namespaces
+- **Estadísticas de Proyecto**: Resúmenes de clases, interfaces, métodos y líneas de código
+
 ## � Herramientas Disponibles
 
 ### 🧪 Herramientas de Sistema
@@ -67,7 +80,13 @@ Un servidor MCP (Model Context Protocol) completo para la gestión de archivos, 
 - **`rename_directory`** - Renombra/mueve directorios
 - **`delete_directory`** - Elimina directorios a la papelera
 
-### 🔐 Verificación de Sistema
+### � Análisis de Código C#
+- **`find_class`** - Localiza clases específicas con búsqueda directa o profunda
+- **`get_cs_file_content`** - Obtiene contenido de archivos C# con análisis automático
+- **`find_elements`** - Busca DTOs, Services, Controllers, Interfaces, Enums
+- **`get_solution_structure`** - Estructura completa de soluciones C# con estadísticas
+
+### �🔐 Verificación de Sistema
 - **`check_permissions`** - Verifica permisos CRUD completos sobre rutas
   - Permisos de lectura, escritura, ejecución
   - Capacidades de creación/eliminación de archivos y directorios
@@ -83,6 +102,7 @@ Un servidor MCP (Model Context Protocol) completo para la gestión de archivos, 
 - **Encoding Inteligente**: Detección automática UTF-8/Latin-1
 - **Validación Robusta**: Prevención de operaciones peligrosas
 - **Limpieza Automática**: Eliminación de directorios vacíos
+- **Análisis Inteligente**: Análisis automático de código C# con estadísticas
 
 ## �📋 Requisitos
 
@@ -257,23 +277,55 @@ await delete_directory(directory_path="./temp/obsolete_files")
 await list_directory(directory_path="./src")
 ```
 
+#### Análisis de Código C#
+
+```python
+# Buscar una clase específica
+find_class(
+    repo_url="https://github.com/usuario/proyecto-csharp.git",
+    class_name="UserService",
+    search_type="direct"  # o "deep" para búsqueda profunda
+)
+
+# Obtener contenido de archivo C# con análisis
+get_cs_file_content(
+    repo_url="https://github.com/usuario/proyecto-csharp.git",
+    file_path="src/Services/UserService.cs"
+)
+
+# Buscar elementos específicos (DTOs, Services, Controllers, etc.)
+find_elements(
+    repo_url="https://github.com/usuario/proyecto-csharp.git",
+    element_type="dto",  # dto, service, controller, interface, enum, class
+    element_name="User"
+)
+
+# Obtener estructura completa de la solución
+get_solution_structure(
+    repo_url="https://github.com/usuario/proyecto-csharp.git"
+)
+```
+
 ## 📚 API Reference
 
-### Herramientas de Código
+### Herramientas de Análisis de Código C#
 
 | Herramienta | Descripción | Parámetros |
 |-------------|-------------|------------|
-| `find_class` | Localiza una clase específica | `repo_url`, `class_name`, `search_type` |
-| `get_file_content` | Obtiene contenido de archivo | `repo_url`, `file_path` |
-| `find_elements` | Busca elementos por tipo | `repo_url`, `element_type`, `element_name` |
+| `find_class` | Localiza clases específicas | `repo_url`, `class_name`, `search_type` |
+| `get_cs_file_content` | Contenido de archivo C# con análisis | `repo_url`, `file_path` |
+| `find_elements` | Busca DTOs, Services, Controllers, etc. | `repo_url`, `element_type`, `element_name` |
+| `get_solution_structure` | Estructura completa de solución C# | `repo_url` |
 
 ### Herramientas de Archivos
 
 | Herramienta | Descripción | Parámetros |
 |-------------|-------------|------------|
-| `create_file` | Crea nuevo archivo | `repo_url`, `file_path`, `content` |
-| `update_file` | Actualiza archivo existente | `repo_url`, `file_path`, `content` |
-| `delete_file` | Elimina archivo | `repo_url`, `file_path` |
+| `get_file_content` | Lee contenido completo de archivo | `file_path` |
+| `set_file_content` | Crea/modifica archivos con backup | `file_path`, `content`, `create_backup` |
+| `rename_file` | Renombra/mueve archivos | `source_path`, `dest_path` |
+| `delete_file` | Elimina archivos a papelera | `file_path` |
+| `copy_file` | Copia archivos | `source_path`, `dest_path` |
 
 ### 🆕 Herramientas de Directorios
 
