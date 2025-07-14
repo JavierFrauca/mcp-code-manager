@@ -285,36 +285,29 @@ class GitManager:
             repo_path = await self._ensure_repo_exists(repo_url)
             repo = Repo(repo_path)
             
-            # Configurar usuario por defecto si no está configurado
-            try:
-                # Verificar si hay configuración de usuario
-                try:
-                    repo.config_reader().get_value("user", "name")
-                    repo.config_reader().get_value("user", "email")
-                except Exception:
-                    # No hay configuración, establecer una por defecto
-                    with repo.config_writer() as git_config:
-                        git_config.set_value("user", "name", "MCP Code Manager")
-                        git_config.set_value("user", "email", "mcp@codemanager.local")
-            except Exception as e:
-                print(f"Warning: No se pudo configurar usuario Git: {e}")
+            # Asegurar configuración de usuario Git
+            await self._ensure_git_config(repo)
             
-            # Añadir archivos al stage
+            # Añadir archivos al stage ANTES de verificar cambios
             if add_all:
                 repo.git.add(A=True)
             elif files:
                 for file in files:
                     repo.index.add([file])
+            else:
+                # Si no se especifican archivos, verificar que ya hay algo staged
+                pass
             
-            # Verificar que hay cambios para commitear
-            if not repo.index.diff("HEAD"):
-                # Si es el primer commit, verificar que hay archivos staged
-                try:
-                    staged_files = repo.index.diff("HEAD")
-                except Exception:
-                    # Probablemente primer commit - verificar archivos en index
-                    if not list(repo.index.entries.keys()):
-                        raise GitError("No hay cambios staged para commitear")
+            # Verificar que hay cambios para commitear DESPUÉS de añadir archivos
+            try:
+                # Para repositorios con commits existentes
+                staged_files = repo.index.diff("HEAD")
+                if not staged_files:
+                    raise GitError("No hay cambios staged para commitear")
+            except Exception:
+                # Primer commit - verificar que hay archivos en el index
+                if not list(repo.index.entries.keys()):
+                    raise GitError("No hay archivos staged para el primer commit")
             
             # Realizar commit
             commit = repo.index.commit(message)
@@ -882,8 +875,8 @@ class GitManager:
     async def reset_repository(
         self, 
         repo_url: str, 
-        mode: str = "mixed",
-        commit_hash: Optional[str] = None
+        commit_hash: Optional[str] = None,
+        mode: str = "mixed"
     ) -> Dict[str, Any]:
         """
         Resetea el repositorio a un estado anterior
@@ -1287,22 +1280,8 @@ class GitManager:
             
             repo = Repo.init(repo_path, bare=bare, initial_branch=initial_branch)
             
-            # Configurar usuario por defecto si no está configurado
-            try:
-                # Verificar si ya hay configuración global
-                try:
-                    repo.config_reader().get_value("user", "name")
-                    repo.config_reader().get_value("user", "email")
-                except Exception:
-                    # No hay configuración, establecer una por defecto
-                    with repo.config_writer() as git_config:
-                        git_config.set_value("user", "name", "MCP Code Manager")
-                        git_config.set_value("user", "email", "mcp@codemanager.local")
-                        git_config.set_value("init", "defaultBranch", "main")
-                        
-            except Exception as e:
-                # Si falla la configuración, solo loggear pero continuar
-                print(f"Warning: No se pudo configurar usuario Git: {e}")
+            # Asegurar configuración de usuario desde el inicio
+            await self._ensure_git_config(repo)
             
             return {
                 "success": True,
@@ -1456,3 +1435,30 @@ class GitManager:
             
         except Exception as e:
             raise GitError(f"Error obteniendo configuración de usuario: {str(e)}")
+    
+    async def _ensure_git_config(self, repo: Repo) -> None:
+        """
+        Asegura que Git tenga configuración de usuario antes de operaciones que requieren commits
+        
+        Args:
+            repo: Instancia del repositorio Git
+        """
+        try:
+            # Verificar configuración existente
+            try:
+                repo.config_reader().get_value("user", "name")
+                repo.config_reader().get_value("user", "email")
+                # Si llegamos aquí, ya hay configuración
+                return
+            except Exception:
+                # No hay configuración, establecer una por defecto
+                pass
+            
+            # Configurar usuario por defecto local al repositorio
+            with repo.config_writer() as git_config:
+                git_config.set_value("user", "name", "MCP Code Manager")
+                git_config.set_value("user", "email", "mcp@codemanager.local")
+                
+        except Exception as e:
+            # Si falla la configuración, imprimir advertencia pero continuar
+            print(f"Warning: No se pudo configurar usuario Git: {e}")

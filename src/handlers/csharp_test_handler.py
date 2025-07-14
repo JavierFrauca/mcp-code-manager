@@ -209,11 +209,55 @@ class CSharpTestHandler:
             Resultado de la operación
         """
         try:
-            # Obtener directorio del repositorio
-            repo_path = await self.file_manager.get_repo_path(repo_url)
+            # Validar parámetros
+            if not repo_url or not repo_url.strip():
+                raise CodeAnalysisError("La URL del repositorio es requerida")
             
-            # Construir ruta absoluta
-            full_project_path = os.path.join(repo_path, project_file)
+            if not project_file or not project_file.strip():
+                raise CodeAnalysisError("El archivo de proyecto es requerido")
+            
+            if not package_name or not package_name.strip():
+                raise CodeAnalysisError("El nombre del paquete es requerido")
+            
+            # Obtener directorio del repositorio con mejor manejo de errores
+            try:
+                repo_path = await self.file_manager.get_repo_path(repo_url)
+            except Exception as e:
+                raise CodeAnalysisError(f"No se pudo obtener la ruta del repositorio '{repo_url}': {str(e)}")
+            
+            if not repo_path:
+                raise CodeAnalysisError(f"No se pudo obtener la ruta del repositorio: {repo_url}")
+            
+            # Construir ruta absoluta del proyecto
+            project_file_clean = project_file.strip()
+            
+            # Si project_file ya es una ruta absoluta, usar directamente
+            if os.path.isabs(project_file_clean):
+                full_project_path = project_file_clean
+            else:
+                # Es una ruta relativa, combinar con repo_path
+                full_project_path = os.path.join(repo_path, project_file_clean)
+            
+            # Normalizar ruta
+            full_project_path = os.path.normpath(os.path.abspath(full_project_path))
+            
+            # Verificar que el archivo de proyecto existe
+            if not os.path.exists(full_project_path):
+                error_msg = f"Archivo de proyecto no encontrado: {full_project_path}\n"
+                error_msg += f"Repo URL: {repo_url}\n"
+                error_msg += f"Repo Path: {repo_path}\n"
+                error_msg += f"Project File: {project_file_clean}\n"
+                error_msg += f"Current Working Directory: {os.getcwd()}\n"
+                
+                # Listar archivos en el directorio del repositorio
+                if os.path.exists(repo_path):
+                    try:
+                        files = os.listdir(repo_path)
+                        error_msg += f"Archivos en repo_path: {files[:10]}...\n"
+                    except Exception:
+                        error_msg += "No se pudieron listar archivos en repo_path\n"
+                
+                raise CodeAnalysisError(error_msg)
             
             # Agregar paquete
             result = await self.csharp_service.add_package(full_project_path, package_name, version)
@@ -221,10 +265,16 @@ class CSharpTestHandler:
             return {
                 "success": True,
                 "message": result["message"],
-                "project_file": project_file,
+                "project_file": project_file_clean,
                 "package": package_name,
                 "version": version or "latest",
-                "output": result["output"]
+                "output": result["output"],
+                "debug_info": {
+                    "repo_url": repo_url,
+                    "repo_path": repo_path,
+                    "full_project_path": full_project_path,
+                    "current_dir": os.getcwd()
+                }
             }
             
         except Exception as e:
@@ -246,14 +296,58 @@ class CSharpTestHandler:
             Resultado de la compilación
         """
         try:
-            # Obtener directorio del repositorio
-            repo_path = await self.file_manager.get_repo_path(repo_url)
+            # Validar parámetros
+            if not repo_url or not repo_url.strip():
+                raise CodeAnalysisError("La URL del repositorio es requerida")
+            
+            if not configuration or not configuration.strip():
+                configuration = "Debug"
+            
+            # Obtener directorio del repositorio con mejor manejo de errores
+            try:
+                repo_path = await self.file_manager.get_repo_path(repo_url)
+            except Exception as e:
+                raise CodeAnalysisError(f"No se pudo obtener la ruta del repositorio '{repo_url}': {str(e)}")
+            
+            if not repo_path:
+                raise CodeAnalysisError(f"No se pudo obtener la ruta del repositorio: {repo_url}")
             
             # Determinar qué compilar
-            if solution_file:
-                build_path = os.path.join(repo_path, solution_file)
+            if solution_file and solution_file.strip():
+                solution_file_clean = solution_file.strip()
+                
+                # Si solution_file ya es una ruta absoluta, usar directamente
+                if os.path.isabs(solution_file_clean):
+                    build_path = solution_file_clean
+                else:
+                    # Es una ruta relativa, combinar con repo_path
+                    build_path = os.path.join(repo_path, solution_file_clean)
+                
+                # Normalizar ruta
+                build_path = os.path.normpath(os.path.abspath(build_path))
+                
+                # Verificar que el archivo de solución existe
+                if not os.path.exists(build_path):
+                    error_msg = f"Archivo de solución no encontrado: {build_path}\n"
+                    error_msg += f"Repo URL: {repo_url}\n"
+                    error_msg += f"Repo Path: {repo_path}\n"
+                    error_msg += f"Solution File: {solution_file_clean}\n"
+                    error_msg += f"Current Working Directory: {os.getcwd()}\n"
+                    
+                    # Listar archivos en el directorio del repositorio
+                    if os.path.exists(repo_path):
+                        try:
+                            files = os.listdir(repo_path)
+                            error_msg += f"Archivos en repo_path: {files[:10]}...\n"
+                        except Exception:
+                            error_msg += "No se pudieron listar archivos en repo_path\n"
+                    
+                    raise CodeAnalysisError(error_msg)
             else:
                 build_path = repo_path
+                # Verificar que el directorio existe
+                if not os.path.exists(build_path):
+                    raise CodeAnalysisError(f"Directorio de repositorio no encontrado: {build_path}")
             
             # Compilar
             result = await self.csharp_service.build_solution(build_path, configuration)
@@ -265,14 +359,20 @@ class CSharpTestHandler:
                 "success": result["success"],
                 "message": result["message"],
                 "configuration": configuration,
-                "solution_file": solution_file or "(directorio completo)",
+                "solution_file": solution_file.strip() if solution_file and solution_file.strip() else "(directorio completo)",
                 "output": formatted_output,
                 "raw_output": result["output"],
                 "analysis": result["analysis"],
                 "has_errors": result["analysis"]["has_errors"],
                 "has_warnings": result["analysis"]["has_warnings"],
                 "error_count": result["analysis"]["error_count"],
-                "warning_count": result["analysis"]["warning_count"]
+                "warning_count": result["analysis"]["warning_count"],
+                "debug_info": {
+                    "repo_url": repo_url,
+                    "repo_path": repo_path,
+                    "build_path": build_path,
+                    "current_dir": os.getcwd()
+                }
             }
             
         except Exception as e:
@@ -292,13 +392,62 @@ class CSharpTestHandler:
             Resultado de la compilación
         """
         try:
-            # Obtener directorio del repositorio
-            repo_path = await self.file_manager.get_repo_path(repo_url)
+            # Validar parámetros
+            if not repo_url or not repo_url.strip():
+                raise CodeAnalysisError("La URL del repositorio es requerida")
             
-            # Construir ruta absoluta
-            full_project_path = os.path.join(repo_path, project_file)
+            if not project_file or not project_file.strip():
+                raise CodeAnalysisError("El archivo de proyecto es requerido")
             
-            # Compilar proyecto específico
+            if not configuration or not configuration.strip():
+                configuration = "Debug"
+            
+            # Obtener directorio del repositorio con mejor manejo de errores
+            try:
+                repo_path = await self.file_manager.get_repo_path(repo_url)
+            except Exception as e:
+                raise CodeAnalysisError(f"No se pudo obtener la ruta del repositorio '{repo_url}': {str(e)}")
+            
+            if not repo_path:
+                raise CodeAnalysisError(f"No se pudo obtener la ruta del repositorio: {repo_url}")
+            
+            # Construir ruta absoluta del proyecto
+            project_file_clean = project_file.strip()
+            
+            # Si project_file ya es una ruta absoluta, usar directamente
+            if os.path.isabs(project_file_clean):
+                full_project_path = project_file_clean
+            else:
+                # Es una ruta relativa, combinar con repo_path
+                full_project_path = os.path.join(repo_path, project_file_clean)
+            
+            # Normalizar ruta
+            full_project_path = os.path.normpath(os.path.abspath(full_project_path))
+            
+            # Verificar que el archivo de proyecto existe
+            if not os.path.exists(full_project_path):
+                # Generar mensaje de error más detallado
+                error_msg = f"Archivo de proyecto no encontrado: {full_project_path}\n"
+                error_msg += f"Repo URL: {repo_url}\n"
+                error_msg += f"Repo Path: {repo_path}\n"
+                error_msg += f"Project File: {project_file_clean}\n"
+                error_msg += f"Current Working Directory: {os.getcwd()}\n"
+                
+                # Listar archivos en el directorio del repositorio
+                if os.path.exists(repo_path):
+                    try:
+                        files = os.listdir(repo_path)
+                        error_msg += f"Archivos en repo_path: {files[:10]}...\n"
+                    except Exception:
+                        error_msg += "No se pudieron listar archivos en repo_path\n"
+                
+                raise CodeAnalysisError(error_msg)
+            
+            # Verificar que es un archivo de proyecto válido
+            if not any(full_project_path.endswith(ext) for ext in ['.csproj', '.fsproj', '.vbproj']):
+                raise CodeAnalysisError(f"Archivo no es un proyecto válido: {full_project_path}")
+            
+            # Compilar proyecto específico usando build_solution con el archivo del proyecto
             result = await self.csharp_service.build_solution(full_project_path, configuration)
             
             # Formatear salida
@@ -308,14 +457,20 @@ class CSharpTestHandler:
                 "success": result["success"],
                 "message": result["message"],
                 "configuration": configuration,
-                "project_file": project_file,
+                "project_file": project_file.strip(),
                 "output": formatted_output,
                 "raw_output": result["output"],
                 "analysis": result["analysis"],
                 "has_errors": result["analysis"]["has_errors"],
                 "has_warnings": result["analysis"]["has_warnings"],
                 "error_count": result["analysis"]["error_count"],
-                "warning_count": result["analysis"]["warning_count"]
+                "warning_count": result["analysis"]["warning_count"],
+                "debug_info": {
+                    "repo_url": repo_url,
+                    "repo_path": repo_path,
+                    "full_project_path": full_project_path,
+                    "current_dir": os.getcwd()
+                }
             }
             
         except Exception as e:
@@ -502,14 +657,52 @@ class CSharpTestHandler:
             Resultado de la restauración
         """
         try:
-            # Obtener directorio del repositorio
-            repo_path = await self.file_manager.get_repo_path(repo_url)
+            # Validar parámetros
+            if not repo_url or not repo_url.strip():
+                raise CodeAnalysisError("La URL del repositorio es requerida")
+            
+            # Obtener directorio del repositorio con mejor manejo de errores
+            try:
+                repo_path = await self.file_manager.get_repo_path(repo_url)
+            except Exception as e:
+                raise CodeAnalysisError(f"No se pudo obtener la ruta del repositorio '{repo_url}': {str(e)}")
+            
+            if not repo_path:
+                raise CodeAnalysisError(f"No se pudo obtener la ruta del repositorio: {repo_url}")
             
             # Construir ruta de restauración
-            if project_path:
-                full_project_path = os.path.join(repo_path, project_path)
+            if project_path and project_path.strip():
+                project_path_clean = project_path.strip()
+                
+                # Si project_path ya es una ruta absoluta, usar directamente
+                if os.path.isabs(project_path_clean):
+                    full_project_path = project_path_clean
+                else:
+                    # Es una ruta relativa, combinar con repo_path
+                    full_project_path = os.path.join(repo_path, project_path_clean)
+                
+                # Normalizar ruta
+                full_project_path = os.path.normpath(os.path.abspath(full_project_path))
             else:
                 full_project_path = repo_path
+            
+            # Verificar que el directorio existe
+            if not os.path.exists(full_project_path):
+                error_msg = f"Directorio de proyecto no encontrado: {full_project_path}\n"
+                error_msg += f"Repo URL: {repo_url}\n"
+                error_msg += f"Repo Path: {repo_path}\n"
+                error_msg += f"Project Path: {project_path}\n"
+                error_msg += f"Current Working Directory: {os.getcwd()}\n"
+                
+                # Listar archivos en el directorio del repositorio
+                if os.path.exists(repo_path):
+                    try:
+                        files = os.listdir(repo_path)
+                        error_msg += f"Archivos en repo_path: {files[:10]}...\n"
+                    except Exception:
+                        error_msg += "No se pudieron listar archivos en repo_path\n"
+                
+                raise CodeAnalysisError(error_msg)
             
             # Restaurar paquetes
             result = await self.csharp_service.restore_packages(full_project_path)
@@ -517,8 +710,14 @@ class CSharpTestHandler:
             return {
                 "success": result["success"],
                 "message": result["message"],
-                "project_path": project_path or "(directorio completo)",
-                "output": result["output"]
+                "project_path": project_path.strip() if project_path and project_path.strip() else "(directorio completo)",
+                "output": result["output"],
+                "debug_info": {
+                    "repo_url": repo_url,
+                    "repo_path": repo_path,
+                    "full_project_path": full_project_path,
+                    "current_dir": os.getcwd()
+                }
             }
             
         except Exception as e:

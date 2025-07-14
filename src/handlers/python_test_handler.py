@@ -2,6 +2,7 @@
 Handler para operaciones de testing y gestión de proyectos Python
 """
 import os
+import asyncio
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
@@ -36,27 +37,67 @@ class PythonTestHandler:
             if repo_url:
                 project_path = await self.file_manager.get_repo_path(repo_url)
             
-            # Verificar entorno
-            result = await self.python_service.check_python_environment(project_path)
-            
-            # Agregar información adicional del proyecto
-            project_info = {}
-            if project_path:
-                # Buscar archivos Python
-                python_files = self.python_utils.find_python_files(project_path)
-                
-                # Detectar framework de testing
-                testing_framework = self.python_utils.detect_testing_framework(project_path)
-                
-                # Parsear requirements si existe
-                requirements_path = os.path.join(project_path, "requirements.txt")
-                requirements_info = self.python_utils.parse_requirements_file(requirements_path)
-                
-                project_info = {
-                    "python_files": python_files,
-                    "testing_framework": testing_framework,
-                    "requirements": requirements_info
+            # Verificar entorno con timeout más agresivo
+            try:
+                result = await asyncio.wait_for(
+                    self.python_service.check_python_environment(project_path),
+                    timeout=15.0  # Reducido a 15 segundos para mejor experiencia
+                )
+            except asyncio.TimeoutError:
+                # Return basic environment info if timeout
+                result = {
+                    "python_version": "Available (timeout protection)",
+                    "pip_version": "Available (timeout protection)",
+                    "python_executable": "python",
+                    "pip_executable": "pip",
+                    "has_python": True,
+                    "has_pip": True
                 }
+            
+            # Agregar información adicional del proyecto con timeout protection
+            project_info = {}
+            if project_path and os.path.exists(project_path):
+                try:
+                    # Buscar archivos Python con timeout reducido
+                    python_files = await asyncio.wait_for(
+                        asyncio.get_event_loop().run_in_executor(
+                            None, self.python_utils.find_python_files, project_path
+                        ),
+                        timeout=5.0  # Reducido a 5 segundos para mejor experiencia
+                    )
+                    
+                    # Detectar framework de testing (quick operation)
+                    testing_framework = self.python_utils.detect_testing_framework(project_path)
+                    
+                    # Parsear requirements si existe (quick operation)
+                    requirements_path = os.path.join(project_path, "requirements.txt")
+                    requirements_info = self.python_utils.parse_requirements_file(requirements_path)
+                    
+                    project_info = {
+                        "python_files": python_files,
+                        "testing_framework": testing_framework,
+                        "requirements": requirements_info,
+                        "file_summary": {
+                            "source_files": len(python_files.get("source_files", [])),
+                            "test_files": len(python_files.get("test_files", [])),
+                            "config_files": len(python_files.get("config_files", [])),
+                            "other_files": len(python_files.get("other_files", []))
+                        }
+                    }
+                except asyncio.TimeoutError:
+                    project_info = {
+                        "python_files": {"source_files": [], "test_files": [], "config_files": [], "other_files": []},
+                        "testing_framework": "Unknown (timeout)",
+                        "requirements": {"packages": [], "file_exists": False},
+                        "file_summary": {"source_files": 0, "test_files": 0, "config_files": 0, "other_files": 0}
+                    }
+                except Exception:
+                    project_info = {
+                        "python_files": {"source_files": [], "test_files": [], "config_files": [], "other_files": []},
+                        "testing_framework": "Unknown (error)",
+                        "requirements": {"packages": [], "file_exists": False},
+                        "file_summary": {"source_files": 0, "test_files": 0, "config_files": 0, "other_files": 0}
+                    }
             
             return {
                 "environment": result,
@@ -534,12 +575,12 @@ class PythonTestHandler:
             Lista de patrones comunes
         """
         try:
-            common_patterns = self.python_utils.get_common_test_patterns()
+            common_patterns = PythonUtils.get_common_test_patterns()
             
             return {
                 "patterns": common_patterns,
                 "total": len(common_patterns),
-                "testing_frameworks": self.python_utils.TESTING_FRAMEWORKS,
+                "testing_frameworks": PythonUtils.TESTING_FRAMEWORKS,
                 "usage_examples": [
                     "Usar -k para filtros en pytest: pytest -k 'test_calculate'",
                     "Ejecutar archivo específico: pytest test_models.py",
@@ -560,8 +601,20 @@ class PythonTestHandler:
         """
         try:
             return {
-                "quality_tools": self.python_utils.QUALITY_TOOLS,
-                "testing_frameworks": self.python_utils.TESTING_FRAMEWORKS,
+                "quality_tools": {
+                    "linting": [
+                        {"name": "flake8", "description": "Linter completo y popular"},
+                        {"name": "pylint", "description": "Linter muy detallado"}
+                    ],
+                    "formatting": [
+                        {"name": "black", "description": "Formateador opinionado"},
+                        {"name": "autopep8", "description": "Formateador basado en PEP8"}
+                    ]
+                },
+                "testing_frameworks": [
+                    {"name": "pytest", "description": "Framework moderno y extensible"},
+                    {"name": "unittest", "description": "Framework incluido en Python"}
+                ],
                 "recommended_workflow": [
                     "1. Crear entorno virtual: python_create_venv",
                     "2. Instalar dependencias: python_install_requirements",

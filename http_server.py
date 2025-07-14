@@ -17,7 +17,7 @@ import os
 # Agregar el directorio src al path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.server import MCPCodeManagerServer
+from src.server_working import MCPCodeManagerServer
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)

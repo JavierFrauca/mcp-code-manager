@@ -392,3 +392,37 @@ class GitHandler:
             return await self.git_manager.get_user_config(repo_url)
         except Exception as e:
             raise GitError(f"Error obteniendo configuración de usuario: {str(e)}")
+    
+    async def clone(
+        self, 
+        repo_url: str, 
+        dest_path: str = None, 
+        force: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Clona un repositorio Git en una carpeta destino
+        
+        Args:
+            repo_url: URL del repositorio
+            dest_path: Carpeta destino (opcional, si no se indica usa la cache interna)
+            force: Si forzar la clonación (eliminar existente)
+            
+        Returns:
+            Información de la clonación
+        """
+        try:
+            # Si se indica carpeta destino, usarla; si no, usa la lógica interna de cache
+            if dest_path:
+                from git import Repo, GitCommandError
+                import os, shutil
+                if os.path.exists(dest_path) and force:
+                    shutil.rmtree(dest_path)
+                if not os.path.exists(dest_path):
+                    Repo.clone_from(repo_url, dest_path)
+                return {"success": True, "path": dest_path}
+            else:
+                # Usa la lógica de cache interna
+                path = await self.git_manager.clone_repository(repo_url, force)
+                return {"success": True, "path": path}
+        except Exception as e:
+            return {"success": False, "error": str(e)}

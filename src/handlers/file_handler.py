@@ -11,6 +11,148 @@ from utils.exceptions import FileOperationError
 from utils.validators import validate_file_path, validate_file_content
 
 class FileHandler:
+    async def get_file_content(self, repo_url: str, file_path: str) -> Dict[str, Any]:
+        """Obtiene el contenido de un archivo"""
+        try:
+            file_path = validate_file_path(file_path, allow_absolute=True)
+            repo_path = await self.file_manager.get_repo_path(repo_url)
+            full_path = os.path.join(repo_path, file_path)
+            if not os.path.exists(full_path):
+                return {"error": f"El archivo '{file_path}' no existe"}
+            if not os.path.isfile(full_path):
+                return {"error": f"'{file_path}' no es un archivo"}
+            try:
+                content = await self.file_manager.read_file(full_path)
+            except UnicodeDecodeError:
+                with open(full_path, encoding='latin-1') as f:
+                    content = f.read()
+            except Exception:
+                with open(full_path, encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+            return {"content": f"Contenido de '{file_path}':\n\n{content}"}
+        except Exception as e:
+            return {"error": f"Error leyendo archivo: {str(e)}"}
+
+    async def create_directory(self, repo_url: str, directory_path: str) -> Dict[str, Any]:
+        """Crea un nuevo directorio"""
+        try:
+            directory_path = validate_file_path(directory_path, allow_absolute=True)
+            repo_path = await self.file_manager.get_repo_path(repo_url)
+            full_path = os.path.join(repo_path, directory_path)
+            if os.path.exists(full_path):
+                if os.path.isdir(full_path):
+                    return {"message": f"📁 El directorio '{directory_path}' ya existe"}
+                else:
+                    return {"error": f"❌ Error: '{directory_path}' existe pero no es un directorio"}
+            os.makedirs(full_path, exist_ok=True)
+            response_text = f"✅ Directorio creado exitosamente\n📁 **Directorio creado:** {directory_path}\n"
+            if len(Path(full_path).parts) > 1:
+                response_text += "📂 **Directorios padre creados automáticamente**\n"
+            return {"message": response_text}
+        except PermissionError:
+            return {"error": f"❌ Error: Sin permisos para crear directorio en '{directory_path}'"}
+        except Exception as e:
+            return {"error": f"❌ Error creando directorio: {str(e)}"}
+
+    async def delete_directory(self, repo_url: str, directory_path: str) -> Dict[str, Any]:
+        """Elimina un directorio"""
+        try:
+            directory_path = validate_file_path(directory_path, allow_absolute=True)
+            repo_path = await self.file_manager.get_repo_path(repo_url)
+            full_path = os.path.join(repo_path, directory_path)
+            if not os.path.exists(full_path):
+                return {"error": f"❌ Error: '{directory_path}' no existe"}
+            if not os.path.isdir(full_path):
+                return {"error": f"❌ Error: '{directory_path}' no es un directorio"}
+            import sys
+            moved_to_trash = False
+            try:
+                if sys.platform == "win32":
+                    import winshell
+                    try:
+                        winshell.delete_file(str(full_path))
+                        moved_to_trash = True
+                    except Exception:
+                        pass
+            except ImportError:
+                pass
+            import shutil
+            if not moved_to_trash:
+                shutil.rmtree(full_path)
+            response_text = f"✅ Directorio eliminado exitosamente\n🗑️ **Directorio eliminado:** {directory_path}\n"
+            if moved_to_trash:
+                response_text += "♻️ **Movido a papelera de reciclaje**\n"
+            return {"message": response_text}
+        except Exception as e:
+            return {"error": f"❌ Error eliminando directorio: {str(e)}"}
+
+    async def rename_directory(self, repo_url: str, old_path: str, new_path: str) -> Dict[str, Any]:
+        """Renombra un directorio"""
+        try:
+            old_path = validate_file_path(old_path, allow_absolute=True)
+            new_path = validate_file_path(new_path, allow_absolute=True)
+            repo_path = await self.file_manager.get_repo_path(repo_url)
+            full_old = os.path.join(repo_path, old_path)
+            full_new = os.path.join(repo_path, new_path)
+            if not os.path.exists(full_old):
+                return {"error": f"❌ Error: '{old_path}' no existe"}
+            if not os.path.isdir(full_old):
+                return {"error": f"❌ Error: '{old_path}' no es un directorio"}
+            if os.path.exists(full_new):
+                return {"error": f"❌ Error: '{new_path}' ya existe"}
+            import shutil
+            shutil.move(full_old, full_new)
+            response_text = f"✅ Directorio renombrado exitosamente\n📁 **Origen:** {old_path}\n📂 **Destino:** {new_path}\n"
+            return {"message": response_text}
+        except Exception as e:
+            return {"error": f"❌ Error renombrando directorio: {str(e)}"}
+
+    async def rename_file(self, repo_url: str, source_path: str, dest_path: str) -> Dict[str, Any]:
+        """Renombra un archivo"""
+        try:
+            source_path = validate_file_path(source_path, allow_absolute=True)
+            dest_path = validate_file_path(dest_path, allow_absolute=True)
+            repo_path = await self.file_manager.get_repo_path(repo_url)
+            full_source = os.path.join(repo_path, source_path)
+            full_dest = os.path.join(repo_path, dest_path)
+            if not os.path.exists(full_source):
+                return {"error": f"❌ Error: '{source_path}' no existe"}
+            if not os.path.isfile(full_source):
+                return {"error": f"❌ Error: '{source_path}' no es un archivo"}
+            if os.path.exists(full_dest):
+                return {"error": f"❌ Error: '{dest_path}' ya existe"}
+            import shutil
+            shutil.move(full_source, full_dest)
+            response_text = f"✅ Archivo renombrado exitosamente\n📄 **Origen:** {source_path}\n📝 **Destino:** {dest_path}\n"
+            return {"message": response_text}
+        except Exception as e:
+            return {"error": f"❌ Error renombrando archivo: {str(e)}"}
+
+    async def list_directory(self, repo_url: str, directory_path: str) -> Dict[str, Any]:
+        """Lista el contenido de un directorio"""
+        try:
+            directory_path = validate_file_path(directory_path, allow_absolute=True)
+            repo_path = await self.file_manager.get_repo_path(repo_url)
+            full_path = os.path.join(repo_path, directory_path)
+            if not os.path.exists(full_path):
+                return {"error": f"Error: El directorio '{directory_path}' no existe"}
+            if not os.path.isdir(full_path):
+                return {"error": f"Error: '{directory_path}' no es un directorio"}
+            items = []
+            for item in sorted(os.listdir(full_path)):
+                item_path = os.path.join(full_path, item)
+                if os.path.isdir(item_path):
+                    items.append(f"📁 {item}/")
+                else:
+                    size = os.path.getsize(item_path)
+                    items.append(f"📄 {item} ({size} bytes)")
+            if not items:
+                content = f"Directorio '{directory_path}' está vacío"
+            else:
+                content = f"Contenido de '{directory_path}':\n\n" + "\n".join(items)
+            return {"content": content}
+        except Exception as e:
+            return {"error": f"Error listando directorio: {str(e)}"}
     """Handler para gestión de archivos en repositorios"""
     
     def __init__(self):
@@ -35,7 +177,7 @@ class FileHandler:
         """
         try:
             # Validar parámetros
-            file_path = validate_file_path(file_path)
+            file_path = validate_file_path(file_path, allow_absolute=True)
             content = validate_file_content(content, file_path)
             
             # Obtener directorio del repositorio
@@ -85,7 +227,7 @@ class FileHandler:
         """
         try:
             # Validar parámetros
-            file_path = validate_file_path(file_path)
+            file_path = validate_file_path(file_path, allow_absolute=True)
             content = validate_file_content(content, file_path)
             
             # Obtener directorio del repositorio
@@ -135,7 +277,7 @@ class FileHandler:
         """
         try:
             # Validar parámetros
-            file_path = validate_file_path(file_path)
+            file_path = validate_file_path(file_path, allow_absolute=True)
             
             # Obtener directorio del repositorio
             repo_path = await self.file_manager.get_repo_path(repo_url)
@@ -182,8 +324,8 @@ class FileHandler:
         """
         try:
             # Validar parámetros
-            source_path = validate_file_path(source_path)
-            dest_path = validate_file_path(dest_path)
+            source_path = validate_file_path(source_path, allow_absolute=True)
+            dest_path = validate_file_path(dest_path, allow_absolute=True)
             
             # Obtener directorio del repositorio
             repo_path = await self.file_manager.get_repo_path(repo_url)
@@ -239,8 +381,8 @@ class FileHandler:
         """
         try:
             # Validar parámetros
-            source_path = validate_file_path(source_path)
-            dest_path = validate_file_path(dest_path)
+            source_path = validate_file_path(source_path, allow_absolute=True)
+            dest_path = validate_file_path(dest_path, allow_absolute=True)
             
             # Obtener directorio del repositorio
             repo_path = await self.file_manager.get_repo_path(repo_url)
@@ -354,7 +496,7 @@ class FileHandler:
                 # Procesar archivos
                 for file_name in files:
                     # Verificar si el archivo coincide con el patrón
-                    if file_pattern and not self._matches_pattern(file_name, file_pattern):
+                    if file_pattern and not self.file_manager._matches_pattern(file_name, file_pattern):
                         continue
                     
                     # Verificar si está excluido
@@ -444,7 +586,7 @@ class FileHandler:
             # Determinar ruta a verificar
             if target_path:
                 # Validar y construir ruta específica
-                target_path = validate_file_path(target_path)
+                target_path = validate_file_path(target_path, allow_absolute=True)
                 check_path = os.path.join(repo_path, target_path)
                 
                 # Verificar que la ruta esté dentro del repositorio

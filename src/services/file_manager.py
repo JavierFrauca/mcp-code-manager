@@ -34,13 +34,28 @@ class FileManager:
         Obtiene la ruta local del repositorio
         
         Args:
-            repo_url: URL del repositorio
+            repo_url: URL del repositorio o ruta local
             
         Returns:
             Ruta local del repositorio
         """
         try:
-            # Generar nombre único basado en la URL
+            # Handle empty repo_url as current directory
+            if not repo_url or repo_url.strip() == "":
+                return os.path.abspath(".")
+            
+            repo_url = repo_url.strip()
+            
+            # NUEVO: Detectar si es una ruta local vs URL remota
+            if self._is_local_path(repo_url):
+                # Es una ruta local - normalizar y verificar que existe
+                normalized_path = os.path.normpath(os.path.abspath(repo_url))
+                if os.path.exists(normalized_path):
+                    return normalized_path
+                else:
+                    raise RepositoryError(f"Directorio local no encontrado: {repo_url} (normalizado: {normalized_path})")
+            
+            # Es una URL remota - usar sistema de cache existente
             repo_hash = hashlib.md5(repo_url.encode()).hexdigest()[:8]
             repo_name = self._extract_repo_name(repo_url)
             local_path = os.path.join(self.cache_dir, f"{repo_name}_{repo_hash}")
@@ -55,6 +70,42 @@ class FileManager:
             if isinstance(e, RepositoryError):
                 raise
             raise FileOperationError(f"Error obteniendo ruta del repositorio: {str(e)}")
+    
+    def _is_local_path(self, path: str) -> bool:
+        """
+        Determina si una cadena es una ruta local vs una URL remota
+        
+        Args:
+            path: Cadena a evaluar
+            
+        Returns:
+            True si es una ruta local
+        """
+        # URLs remotas comunes
+        remote_schemes = ['http://', 'https://', 'git://', 'ssh://', 'ftp://']
+        
+        # Si contiene algún esquema remoto, es URL
+        for scheme in remote_schemes:
+            if path.lower().startswith(scheme):
+                return False
+        
+        # Si contiene @ (git@github.com), es URL remota
+        if '@' in path and ':' in path:
+            return False
+        
+        # Windows: C:\, D:\, \\server\share
+        if len(path) > 1 and path[1] == ':':  # C:, D:, etc.
+            return True
+        
+        if path.startswith('\\\\'):  # UNC path \\server\share
+            return True
+        
+        # Unix/Linux: /, ./, ../
+        if path.startswith('/') or path.startswith('./') or path.startswith('../'):
+            return True
+        
+        # Ruta relativa simple (no contiene esquemas remotos)
+        return True
     
     async def read_file(self, file_path: str) -> str:
         """

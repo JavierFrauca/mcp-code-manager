@@ -8,7 +8,8 @@ Este documento describe el funcionamiento técnico del MCP Code Manager, su arqu
 
 MCP Code Manager está estructurado en módulos Python organizados en carpetas como `src/handlers`, `src/services` y `src/utils`. Utiliza la librería GitPython para interactuar con repositorios Git y abstrae operaciones comunes en clases y servicios reutilizables.
 
-### Componentes principales:
+### Componentes principales
+
 - **handlers/**: Gestionan la lógica de alto nivel y orquestan las peticiones del usuario.
 - **services/**: Implementan la lógica de negocio, como operaciones Git, análisis de código, gestión de archivos, etc.
 - **utils/**: Utilidades y funciones auxiliares (validaciones, logging, excepciones personalizadas).
@@ -92,7 +93,6 @@ MCP Code Manager está estructurado en módulos Python organizados en carpetas c
 
 ---
 
-
 ---
 
 ## 12. Diagrama de bloques (flujo principal)
@@ -129,6 +129,7 @@ MCP Code Manager está estructurado en módulos Python organizados en carpetas c
 ```
 
 **Notas:**
+
 - El usuario interactúa con la interfaz (CLI, web, etc.), que llama a un handler.
 - El handler delega la operación al servicio correspondiente.
 - El servicio usa utilidades y GitPython para realizar la acción.
