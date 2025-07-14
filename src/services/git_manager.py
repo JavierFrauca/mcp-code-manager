@@ -1,15 +1,22 @@
 """
-Servicio para gestión de operaciones Git
+Servicio para gestión de operaciones Git - VERSIÓN CORREGIDA
 """
 import os
 import hashlib
+import os
+import hashlib
+import shutil
 import tempfile
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 from git import Repo, GitCommandError, InvalidGitRepositoryError
-import git
 
-from utils.exceptions import GitError, RepositoryError
-from services.file_manager import FileManager
+try:
+    from ..utils.exceptions import GitError, RepositoryError
+    from .file_manager import FileManager
+except ImportError:
+    # Fallback para cuando se ejecuta como script standalone
+    from utils.exceptions import GitError, RepositoryError
+    from services.file_manager import FileManager
 
 class GitManager:
     """Gestor de operaciones Git"""
@@ -37,7 +44,6 @@ class GitManager:
             
             # Si ya existe y force=True, eliminar
             if os.path.exists(local_path) and force:
-                import shutil
                 shutil.rmtree(local_path)
             
             # Si no existe, clonar
@@ -169,62 +175,6 @@ class GitManager:
                 "ahead": ahead,
                 "behind": behind,
                 "last_commit": last_commit
-            }
-            
-        except InvalidGitRepositoryError:
-            raise GitError("El directorio no es un repositorio Git válido")
-        except Exception as e:
-            raise GitError(f"Error obteniendo estado del repositorio: {str(e)}")
-            
-            # Conflictos (si los hay)
-            conflicts = []
-            try:
-                for item in repo.index.unmerged_blobs():
-                    conflicts.append(item)
-            except Exception:
-                pass
-            
-            # Estado limpio
-            is_clean = (
-                len(staged_files) == 0 and 
-                len(unstaged_files) == 0 and 
-                len(untracked_files) == 0 and 
-                len(conflicts) == 0
-            )
-            
-            # Generar resumen
-            summary_parts = []
-            if ahead > 0:
-                summary_parts.append(f"{ahead} commits ahead")
-            if behind > 0:
-                summary_parts.append(f"{behind} commits behind")
-            if len(staged_files) > 0:
-                summary_parts.append(f"{len(staged_files)} staged files")
-            if len(unstaged_files) > 0:
-                summary_parts.append(f"{len(unstaged_files)} unstaged files")
-            if len(untracked_files) > 0:
-                summary_parts.append(f"{len(untracked_files)} untracked files")
-            if len(conflicts) > 0:
-                summary_parts.append(f"{len(conflicts)} conflicts")
-            
-            summary = ", ".join(summary_parts) if summary_parts else "Working tree clean"
-            
-            return {
-                "branch": current_branch,
-                "behind": behind,
-                "ahead": ahead,
-                "staged": staged_files,
-                "unstaged": unstaged_files,
-                "untracked": untracked_files,
-                "conflicts": conflicts,
-                "clean": is_clean,
-                "summary": summary,
-                "last_commit": {
-                    "hash": repo.head.commit.hexsha[:8],
-                    "message": repo.head.commit.message.strip(),
-                    "author": repo.head.commit.author.name,
-                    "date": repo.head.commit.committed_datetime.isoformat()
-                }
             }
             
         except InvalidGitRepositoryError:
@@ -1207,7 +1157,7 @@ class GitManager:
     
     async def _ensure_repo_exists(self, repo_url: str) -> str:
         """
-        Asegura que el repositorio existe localmente
+        MÉTODO CORREGIDO - Asegura que el repositorio existe localmente
         
         Args:
             repo_url: URL del repositorio o ruta local
@@ -1216,44 +1166,50 @@ class GitManager:
             Ruta local del repositorio
         """
         try:
-            # Detectar si es una ruta local existente
-            if os.path.exists(repo_url):
-                # Es una ruta local existente
+            # Manejar rutas locales
+            if repo_url in (".", ""):
+                path = os.getcwd()
+            elif not repo_url.startswith(('http://', 'https://', 'git://', 'ssh://', 'git@')):
+                # Es una ruta local
                 path = os.path.abspath(repo_url)
-                # Verificar que sea un repositorio git válido
-                if os.path.exists(os.path.join(path, '.git')):
-                    return path
-                else:
-                    raise GitError(f"El directorio '{repo_url}' no es un repositorio Git válido")
-            
-            # Si es "." usar el directorio actual
-            if repo_url == ".":
-                current_dir = os.getcwd()
-                if os.path.exists(os.path.join(current_dir, '.git')):
-                    return current_dir
-                else:
-                    raise GitError(f"El directorio actual '{current_dir}' no es un repositorio Git válido")
-            
-            # Para rutas relativas, convertir a absolutas
-            if not repo_url.startswith(('http://', 'https://', 'git://', 'ssh://', 'git@')):
-                abs_path = os.path.abspath(repo_url)
-                if os.path.exists(abs_path):
-                    if os.path.exists(os.path.join(abs_path, '.git')):
-                        return abs_path
-                    else:
-                        raise GitError(f"El directorio '{repo_url}' no es un repositorio Git válido")
-                else:
+                if not os.path.exists(path):
                     raise GitError(f"El directorio '{repo_url}' no existe")
+            else:
+                # Es una URL remota
+                try:
+                    return await self.file_manager.get_repo_path(repo_url)
+                except RepositoryError:
+                    return await self.clone_repository(repo_url)
             
-            # Si llegamos aquí, es una URL remota - usar el comportamiento original
+            # Verificar si es un repositorio Git válido usando solo GitPython
+            git_dir = os.path.join(path, '.git')
+            if not os.path.exists(git_dir):
+                raise GitError(f"El directorio '{repo_url}' no es un repositorio Git válido")
+                
+            # CAMBIO PRINCIPAL: Usar GitPython en lugar de subprocess
             try:
-                return await self.file_manager.get_repo_path(repo_url)
-            except RepositoryError:
-                # Si no existe, clonarlo
-                return await self.clone_repository(repo_url)
+                from git import Repo, InvalidGitRepositoryError
+                repo = Repo(path)
+                
+                # Verificación básica sin operaciones pesadas
+                if repo.bare:
+                    raise GitError(f"Repositorio bare no soportado: '{repo_url}'")
+                    
+                # Verificar que tiene al menos estructura válida
+                try:
+                    # Verificación liviana: solo verificar que el objeto repo es válido
+                    _ = repo.git_dir  # Esto es muy rápido
+                except Exception:
+                    raise GitError(f"Estructura de repositorio Git inválida: '{repo_url}'")
+                    
+                return path
+                
+            except InvalidGitRepositoryError:
+                raise GitError(f"El directorio '{repo_url}' no es un repositorio Git válido")
+            except Exception as e:
+                raise GitError(f"Error verificando repositorio Git: {str(e)}")
                 
         except GitError:
-            # Re-lanzar errores Git específicos
             raise
         except Exception as e:
             raise GitError(f"Error accediendo al repositorio: {str(e)}")
@@ -1431,3 +1387,72 @@ class GitManager:
             
         except Exception as e:
             raise GitError(f"Error agregando archivos: {str(e)}")
+    
+    async def get_user_config(self, repo_url: str) -> Dict[str, Any]:
+        """
+        MÉTODO CORREGIDO - Obtiene la configuración de usuario Git sin subprocess
+        
+        Args:
+            repo_url: URL del repositorio o ruta local
+            
+        Returns:
+            Configuración de usuario Git
+        """
+        try:
+            repo_path = await self._ensure_repo_exists(repo_url)
+            repo = Repo(repo_path)
+            
+            user_config = {}
+            
+            # Intentar obtener configuración usando solo GitPython
+            try:
+                config_reader = repo.config_reader()
+                
+                # Nombre de usuario
+                try:
+                    user_config["name"] = config_reader.get_value("user", "name")
+                    user_config["name_scope"] = "local"
+                except Exception:
+                    # Intentar configuración global usando GitPython
+                    try:
+                        global_config = repo.config_reader("global")
+                        user_config["name"] = global_config.get_value("user", "name")
+                        user_config["name_scope"] = "global"
+                    except Exception:
+                        user_config["name"] = "No configurado"
+                        user_config["name_scope"] = "none"
+                
+                # Email de usuario
+                try:
+                    user_config["email"] = config_reader.get_value("user", "email")
+                    user_config["email_scope"] = "local"
+                except Exception:
+                    # Intentar configuración global usando GitPython
+                    try:
+                        global_config = repo.config_reader("global")
+                        user_config["email"] = global_config.get_value("user", "email")
+                        user_config["email_scope"] = "global"
+                    except Exception:
+                        user_config["email"] = "No configurado"
+                        user_config["email_scope"] = "none"
+                        
+                # Información adicional del repositorio
+                user_config["repository_path"] = repo_path
+                user_config["current_branch"] = repo.active_branch.name if repo.active_branch else "No branch"
+                
+            except Exception as e:
+                raise GitError(f"Error leyendo configuración: {str(e)}")
+            
+            return {
+                "success": True,
+                "message": f"Configuración de usuario obtenida",
+                "user_name": user_config.get("name", "No configurado"),
+                "user_email": user_config.get("email", "No configurado"),
+                "name_scope": user_config.get("name_scope", "none"),
+                "email_scope": user_config.get("email_scope", "none"),
+                "repository_path": user_config.get("repository_path", ""),
+                "current_branch": user_config.get("current_branch", "")
+            }
+            
+        except Exception as e:
+            raise GitError(f"Error obteniendo configuración de usuario: {str(e)}")

@@ -9,7 +9,11 @@ from typing import Dict, Optional
 from pathlib import Path
 import aiofiles
 
-from utils.exceptions import FileOperationError, RepositoryError
+try:
+    from ..utils.exceptions import FileOperationError, RepositoryError
+except ImportError:
+    # Fallback para cuando se ejecuta como script standalone
+    from utils.exceptions import FileOperationError, RepositoryError
 
 class FileManager:
     """Gestor de archivos y repositorios locales"""

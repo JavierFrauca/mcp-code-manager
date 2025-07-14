@@ -377,3 +377,18 @@ class GitHandler:
             return await self.git_manager.add_files(repo_url, files, all_files, update)
         except Exception as e:
             raise GitError(f"Error agregando archivos: {str(e)}")
+    
+    async def get_user_config(self, repo_url: str) -> Dict[str, Any]:
+        """
+        Obtiene la configuración de usuario Git
+        
+        Args:
+            repo_url: URL del repositorio
+            
+        Returns:
+            Configuración de usuario Git
+        """
+        try:
+            return await self.git_manager.get_user_config(repo_url)
+        except Exception as e:
+            raise GitError(f"Error obteniendo configuración de usuario: {str(e)}")
